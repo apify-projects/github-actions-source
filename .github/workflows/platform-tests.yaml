@@ -1,0 +1,73 @@
+name: Platform tests
+
+on:
+    workflow_call:
+        inputs:
+            subtest:
+                type: string
+                default: ""
+                required: false
+            working-directory:
+                type: string
+                default: .
+                required: false
+
+jobs:
+    scheduledPlatformTests:
+        name: Scheduled Platform tests
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ${{ inputs.working-directory }}
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v4
+              with:
+                fetch-depth: 0
+
+            - uses: oNaiPs/secrets-to-env-action@b64e0192bc4bd2ec0682dee8696470d4866577fa
+              with:
+                secrets: ${{ toJSON(secrets) }}
+
+            - name: Install dependencies
+              run: npm install
+
+            # Repos can still have older version locally but on cloud we enforce uniformity
+            - name: Enforce latest test tools version
+              # We don't override beta so we can use it to test branch-specific versions of apify-test-tools
+              run: |
+                  if ! npm list apify-test-tools | grep -q "apify-test-tools@.*-beta"; then
+                    echo "Didn't find beta version, installing latest apify-test-tools"
+                    npm install apify-test-tools@latest;
+                  else
+                    echo "Beta version of apify-test-tools is installed, we assume this is testing the library so we won't update it to latest"
+                  fi
+
+            - name: Test
+              run: |
+                  set +e
+                  export RUN_ALL_PLATFORM_TESTS=1
+                  npx vitest ./test/platform/${{ inputs.subtest }} \
+                    --run \
+                    --reporter=default \
+                    --reporter=json \
+                    --outputFile=./test-output.json \
+                    --maxConcurrency 20 \
+                    --fileParallelism=true \
+                    --maxWorkers 100
+                  return_code=$?
+                  npx apify-test-tools report-tests \
+                    --report-file ./test-output.json \
+                    --workspace . \
+                    --workflow-name "${{ github.workflow }}" \
+                    --job-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+                    --report-slack-channel "#notif-${{ github.event.repository.name }}"
+                  exit $return_code
+
+            - name: Upload Vitest JSON artifact
+              uses: actions/upload-artifact@v6
+              if: always()
+              with:
+                  name: vitest-results
+                  path: ./test-output.json

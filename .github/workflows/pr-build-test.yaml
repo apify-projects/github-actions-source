@@ -1,0 +1,164 @@
+name: Test
+
+on:
+    workflow_call:
+        inputs:
+            working-directory:
+                type: string
+                default: .
+                required: false
+            skip-platform-tests:
+                type: boolean
+                default: false
+                required: false
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+
+    checkTestFolder:
+        if: ${{ !inputs.skip-platform-tests }}
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ${{ inputs.working-directory }}
+        
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+            - name: Check for test folder
+              id: check
+              run: |
+                if [ ! -d "test/platform" ]; then
+                    echo "No platform test folder found. Failing the workflow."
+                    exit 1
+                fi
+
+    platformTest:
+        if: ${{ !inputs.skip-platform-tests }}
+        needs: checkTestFolder
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ${{ inputs.working-directory }}
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v4
+              with:
+                fetch-depth: 0
+
+            - uses: oNaiPs/secrets-to-env-action@b64e0192bc4bd2ec0682dee8696470d4866577fa
+              with:
+                secrets: ${{ toJSON(secrets) }}
+
+            - name: Pick last validated commit from cache
+              id: base_commit
+              uses: actions/cache@v4
+              with:
+                # We have to call it base commit for the library but it makes more sense as "last validated commit"
+                # Using run_id ensures the key is always unique so the cache always saves at end-of-job (no "cache hit, not saving" issue)
+                path: ./base_commit.txt
+                key: base_commit-${{ github.run_id }}
+                # This is needed to force overriding the cache with new entry at the end
+                restore-keys: base_commit-
+
+            - name: Install dependencies
+              run: npm install
+
+            # Repos can still have older version locally but on cloud we enforce uniformity
+            - name: Enforce latest test tools version
+              # We don't override beta so we can use it to test branch-specific versions of apify-test-tools
+              run: |
+                  if ! npm list apify-test-tools | grep -q "apify-test-tools@.*-beta"; then
+                    echo "Didn't find beta version, installing latest apify-test-tools"
+                    npm install apify-test-tools@latest;
+                  else
+                    echo "Beta version of apify-test-tools is installed, we assume this is testing the library so we won't update it to latest"
+                  fi
+
+            - name: Build
+              id: build
+              run: |
+                  base_commit=$(cat base_commit.txt 2>/dev/null || echo "")
+                  echo "Last validated (base) commit to be used for build & test: $base_commit"
+                  args=(--source-branch "origin/${{ github.head_ref }}" --target-branch "origin/${{ github.base_ref }}")
+                  [ -n "$base_commit" ] && args+=(--base-commit "$base_commit")
+                  actor_builds=$(npx apify-test-tools build "${args[@]}")
+                  echo "actor_builds=$actor_builds" | tee -a $GITHUB_OUTPUT
+
+            - name: Test
+              run: |
+                  export ACTOR_BUILDS='${{ steps.build.outputs.actor_builds }}'
+                  export RUN_PLATFORM_TESTS=1
+                  npx vitest ./test/platform --run --maxConcurrency 20 --fileParallelism=true --maxWorkers 100
+
+            # NOTE: This is an optimization that if we did functional changes and later only cosmetic changes (e.g. dev reamde), we will compare changes files only for the last commit. We want to cache the latest commit only if the tests are successful
+            - name: Store last validated commit to cache
+              # We only want to store base commit if there were functional changes. If there are no functional changes, not having base commit will allow us to compare branches directly with git diff target_branch...source_branch which can understand that functional changes come from merge commit with target branch. This way we don't have to run tests if we have just readme changes but we need to merge master in. If there were no functional changes, base commit is useless anyway.
+              if: steps.build.outputs.actor_builds != '[]'
+              run: |
+                  base_commit=$(cat base_commit.txt 2>/dev/null || echo "")
+                  echo "Old last validated (base) commit: $base_commit"
+                  args=(--source-branch "origin/${{ github.head_ref }}" --target-branch "origin/${{ github.base_ref }}")
+                  [ -n "$base_commit" ] && args+=(--base-commit "$base_commit")
+                  npx apify-test-tools get-latest-commit "${args[@]}" > ./base_commit.txt
+                  echo "New last validated (base) commit: $(cat base_commit.txt)"
+
+    unitTest:
+        # TODO: only run on changes to code
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ${{ inputs.working-directory }}
+
+        steps:
+            -   name: Checkout repository
+                uses: actions/checkout@v4
+                
+            -   name: Use Node.js 20
+                uses: actions/setup-node@v3
+                with:
+                    node-version: 20
+                    cache: 'npm'
+                    cache-dependency-path: ${{ inputs.working-directory }} # https://github.com/actions/setup-node/issues/706
+            -   name: Install Dependencies
+                run: npm ci
+
+            -   name: TypeScript
+                # Some repos require custom build checks, so we check if the `build-check` script exists and run it if 
+                # it does. Otherwise default to the standard `npx tsc --noEmit` check
+                run: |
+                    HAS_CUSTOM_BUILD_CHECK=$(npx -y json -f package.json scripts.build-check)
+                    if [ -z "$HAS_CUSTOM_BUILD_CHECK" ]; then
+                        npx tsc --noEmit;
+                    else
+                        npm run build-check;
+                    fi
+
+            -   name: Lint
+                run: npm run lint
+
+            -   name: Test
+                run: npm test
+
+            -   name: Prettier Check
+                run: |
+                    if [ -d "node_modules/prettier" ]; then
+                        npx prettier --check .;
+                    else
+                        echo "Prettier is not installed. Skipping Prettier check.";
+                    fi
+
+            -   name: Unused Exports Check
+                run: |
+                    if [ -d "node_modules/knip" ]; then  
+                        echo "Knip is installed. Running knip to check for unused exports.";  
+                        npx knip --include exports,types;
+                    elif [ -d "node_modules/ts-unused-exports" ]; then
+                        echo "Knip is not installed, but ts-unused-exports is. Running ts-unused-exports to check for unused exports.";
+                        npx ts-unused-exports ./tsconfig.json;
+                    else
+                        echo "knip nor ts-unused-exports are installed. Skipping unused exports check.";
+                    fi
