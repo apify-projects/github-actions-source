@@ -31,7 +31,7 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
             - name: Check for test folder
               id: check
               run: |
@@ -49,7 +49,7 @@ jobs:
                 working-directory: ${{ inputs.working-directory }}
         steps:
             - name: Checkout Repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
               with:
                   fetch-depth: 0
 
@@ -59,7 +59,7 @@ jobs:
 
             - name: Pick last validated commit from cache
               id: base_commit
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   # We have to call it base commit for the library but it makes more sense as "last validated commit"
                   # Using run_id ensures the key is always unique so the cache always saves at end-of-job (no "cache hit, not saving" issue)
