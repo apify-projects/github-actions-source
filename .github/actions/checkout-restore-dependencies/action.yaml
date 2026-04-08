@@ -18,4 +18,4 @@ runs:
           with:
               fail-on-cache-miss: true
               path: ${{ inputs.working-directory }}/node_modules
-              key: modules-npm-${{ inputs.working-directory }}-${{ hashFiles('package-lock.json') }}
+              key: modules-npm-${{ inputs.working-directory }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
