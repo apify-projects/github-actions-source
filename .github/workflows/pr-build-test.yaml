@@ -121,7 +121,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - name: Setup repository and dependencies
-              uses: "./.github/actions/checkout-restore-dependencies"
+              uses: apify-projects/github-actions-source/.github/actions/checkout-restore-dependencies@dependency-cache
               with:
                   working-directory: ${{ inputs.working-directory }}
 
