@@ -119,6 +119,7 @@ jobs:
                 working-directory: ${{ inputs.working-directory }}
 
         steps:
+            - uses: actions/checkout@v4
             - name: Setup repository and dependencies
               uses: "./.github/actions/checkout-restore-dependencies"
               with:
