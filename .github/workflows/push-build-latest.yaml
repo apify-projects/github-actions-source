@@ -10,10 +10,10 @@ on:
 
 jobs:
     pushBuildLatest:
-        name: 'Build latest: ${{github.repository}} ${{github.event.head_commit.message}}'
+        name: "Build latest: ${{github.repository}} ${{github.event.head_commit.message}}"
         if: |
-          !contains(github.event.head_commit.message, '[skip ci]') &&
-          !contains(github.event.head_commit.message, '[skip platform-test]')
+            !contains(github.event.head_commit.message, '[skip ci]') &&
+            !contains(github.event.head_commit.message, '[skip platform-test]')
 
         runs-on: ubuntu-latest
         defaults:
@@ -21,14 +21,14 @@ jobs:
                 working-directory: ${{ inputs.working-directory }}
 
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
               with:
-                fetch-depth: 0
+                  fetch-depth: 0
             # A simple node script that converts secrets to env vars
             # Use specific commit SHA to prevent someone stealing that repo
             - uses: oNaiPs/secrets-to-env-action@b64e0192bc4bd2ec0682dee8696470d4866577fa
               with:
-                secrets: ${{ toJSON(secrets) }}
+                  secrets: ${{ toJSON(secrets) }}
 
             - name: Install dependencies
               run: npm install
