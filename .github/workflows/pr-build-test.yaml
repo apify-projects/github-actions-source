@@ -17,24 +17,23 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
-
     checkTestFolder:
         if: ${{ !inputs.skip-platform-tests }}
         runs-on: ubuntu-latest
         defaults:
             run:
                 working-directory: ${{ inputs.working-directory }}
-        
+
         steps:
             - name: Checkout
               uses: actions/checkout@v4
             - name: Check for test folder
               id: check
               run: |
-                if [ ! -d "test/platform" ]; then
-                    echo "No platform test folder found. Failing the workflow."
-                    exit 1
-                fi
+                  if [ ! -d "test/platform" ]; then
+                      echo "No platform test folder found. Failing the workflow."
+                      exit 1
+                  fi
 
     platformTest:
         if: ${{ !inputs.skip-platform-tests }}
@@ -47,22 +46,22 @@ jobs:
             - name: Checkout Repository
               uses: actions/checkout@v4
               with:
-                fetch-depth: 0
+                  fetch-depth: 0
 
             - uses: oNaiPs/secrets-to-env-action@b64e0192bc4bd2ec0682dee8696470d4866577fa
               with:
-                secrets: ${{ toJSON(secrets) }}
+                  secrets: ${{ toJSON(secrets) }}
 
             - name: Pick last validated commit from cache
               id: base_commit
               uses: actions/cache@v4
               with:
-                # We have to call it base commit for the library but it makes more sense as "last validated commit"
-                # Using run_id ensures the key is always unique so the cache always saves at end-of-job (no "cache hit, not saving" issue)
-                path: ./base_commit.txt
-                key: base_commit-${{ github.run_id }}
-                # This is needed to force overriding the cache with new entry at the end
-                restore-keys: base_commit-
+                  # We have to call it base commit for the library but it makes more sense as "last validated commit"
+                  # Using run_id ensures the key is always unique so the cache always saves at end-of-job (no "cache hit, not saving" issue)
+                  path: ./base_commit.txt
+                  key: base_commit-${{ github.run_id }}
+                  # This is needed to force overriding the cache with new entry at the end
+                  restore-keys: base_commit-
 
             - name: Install dependencies
               run: npm install
@@ -114,51 +113,51 @@ jobs:
                 working-directory: ${{ inputs.working-directory }}
 
         steps:
-            -   name: Checkout repository
-                uses: actions/checkout@v4
-                
-            -   name: Use Node.js 20
-                uses: actions/setup-node@v3
-                with:
-                    node-version: 20
-                    cache: 'npm'
-                    cache-dependency-path: ${{ inputs.working-directory }} # https://github.com/actions/setup-node/issues/706
-            -   name: Install Dependencies
-                run: npm ci
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-            -   name: TypeScript
-                # Some repos require custom build checks, so we check if the `build-check` script exists and run it if 
-                # it does. Otherwise default to the standard `npx tsc --noEmit` check
-                run: |
-                    HAS_CUSTOM_BUILD_CHECK=$(npx -y json -f package.json scripts.build-check)
-                    if [ -z "$HAS_CUSTOM_BUILD_CHECK" ]; then
-                        npx tsc --noEmit;
-                    else
-                        npm run build-check;
-                    fi
+            - name: Use Node.js 20
+              uses: actions/setup-node@v3
+              with:
+                  node-version: 20
+                  cache: "npm"
+                  cache-dependency-path: ${{ inputs.working-directory }} # https://github.com/actions/setup-node/issues/706
+            - name: Install Dependencies
+              run: npm ci
 
-            -   name: Lint
-                run: npm run lint
+            - name: TypeScript
+              # Some repos require custom build checks, so we check if the `build-check` script exists and run it if
+              # it does. Otherwise default to the standard `npx tsc --noEmit` check
+              run: |
+                  HAS_CUSTOM_BUILD_CHECK=$(npx -y json -f package.json scripts.build-check)
+                  if [ -z "$HAS_CUSTOM_BUILD_CHECK" ]; then
+                      npx tsc --noEmit;
+                  else
+                      npm run build-check;
+                  fi
 
-            -   name: Test
-                run: npm test
+            - name: Lint
+              run: npm run lint
 
-            -   name: Prettier Check
-                run: |
-                    if [ -d "node_modules/prettier" ]; then
-                        npx prettier --check .;
-                    else
-                        echo "Prettier is not installed. Skipping Prettier check.";
-                    fi
+            - name: Test
+              run: npm test
 
-            -   name: Unused Exports Check
-                run: |
-                    if [ -d "node_modules/knip" ]; then  
-                        echo "Knip is installed. Running knip to check for unused exports.";  
-                        npx knip --include exports,types;
-                    elif [ -d "node_modules/ts-unused-exports" ]; then
-                        echo "Knip is not installed, but ts-unused-exports is. Running ts-unused-exports to check for unused exports.";
-                        npx ts-unused-exports ./tsconfig.json;
-                    else
-                        echo "knip nor ts-unused-exports are installed. Skipping unused exports check.";
-                    fi
+            - name: Prettier Check
+              run: |
+                  if [ -d "node_modules/prettier" ]; then
+                      npx prettier --check .;
+                  else
+                      echo "Prettier is not installed. Skipping Prettier check.";
+                  fi
+
+            - name: Unused Exports Check
+              run: |
+                  if [ -d "node_modules/knip" ]; then  
+                      echo "Knip is installed. Running knip to check for unused exports.";  
+                      npx knip --include exports,types;
+                  elif [ -d "node_modules/ts-unused-exports" ]; then
+                      echo "Knip is not installed, but ts-unused-exports is. Running ts-unused-exports to check for unused exports.";
+                      npx ts-unused-exports ./tsconfig.json;
+                  else
+                      echo "knip nor ts-unused-exports are installed. Skipping unused exports check.";
+                  fi
