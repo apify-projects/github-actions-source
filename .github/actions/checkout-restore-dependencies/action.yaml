@@ -1,0 +1,21 @@
+name: Checkout and restore dependencies
+description: Checkout and restore dependencies
+inputs:
+  working-directory:
+    description: Working directory
+    required: false
+    default: .
+
+runs:
+  using: "composite"
+  steps:
+    - id: checkout
+      uses: actions/checkout@v4
+
+    - name: Load cached dependencies
+      id: restore-dependency-cache
+      uses: actions/cache/restore@v4
+      with:
+        fail-on-cache-miss: true
+        path: ${{ inputs.working-directory }}/node_modules
+        key: modules-npm-${{ inputs.working-directory }}-${{ hashFiles('package-lock.json') }}
