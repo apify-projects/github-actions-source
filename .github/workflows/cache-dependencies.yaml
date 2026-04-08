@@ -1,0 +1,30 @@
+name: Cache Dependencies
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        type: string
+        default: .
+        required: false
+
+jobs:
+  cache-dependencies:
+    name: Cache Dependencies
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache dependencies npm
+        id: check-dependencies-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ inputs.working-directory }}/node_modules
+          key: modules-npm-${{ inputs.working-directory }}-${{ hashFiles('package-lock.json') }}
+
+      - name: install npm dependencies
+        if: steps.check-dependencies-cache.outputs.cache-hit != 'true'
+        run: npm ci
