@@ -119,23 +119,12 @@ jobs:
                 working-directory: ${{ inputs.working-directory }}
 
         steps:
-            - uses: actions/checkout@v4
             - name: Setup repository and dependencies
+              # Referenced globally, local reference failed when looking for the action in the consumer repo
+              # it was being looked for within the repo, not as a relative path to this job when invoked
               uses: apify-projects/github-actions-source/.github/actions/checkout-restore-dependencies@dependency-cache
               with:
                   working-directory: ${{ inputs.working-directory }}
-
-            # - name: Checkout repository
-            #   uses: actions/checkout@v4
-
-            # - name: Use Node.js 20
-            #   uses: actions/setup-node@v3
-            #   with:
-            #       node-version: 20
-            #       cache: "npm"
-            #       cache-dependency-path: ${{ inputs.working-directory }} # https://github.com/actions/setup-node/issues/706
-            # - name: Install Dependencies
-            #   run: npm ci
 
             - name: TypeScript
               # Some repos require custom build checks, so we check if the `build-check` script exists and run it if
