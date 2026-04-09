@@ -7,6 +7,10 @@ on:
                 type: string
                 default: .
                 required: false
+            additional-working-directory:
+                type: string
+                required: false
+                default: ""
             skip-platform-tests:
                 type: boolean
                 default: false
@@ -21,6 +25,7 @@ jobs:
         uses: ./.github/workflows/cache-dependencies.yaml
         with:
             working-directory: ${{ inputs.working-directory }}
+            additional-working-directory: ${{ inputs.additional-working-directory }}
 
     checkTestFolder:
         if: ${{ !inputs.skip-platform-tests }}

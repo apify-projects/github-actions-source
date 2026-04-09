@@ -2,9 +2,15 @@ name: Checkout and restore dependencies
 description: Checkout and restore dependencies
 inputs:
     working-directory:
+        type: string
         description: Working directory
         required: false
         default: .
+    additional-working-directory:
+        type: string
+        description: Additional working directory
+        required: false
+        default: ""
 
 runs:
     using: "composite"
@@ -19,3 +25,12 @@ runs:
               fail-on-cache-miss: true
               path: ${{ inputs.working-directory }}/node_modules
               key: modules-npm-${{ inputs.working-directory }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
+
+        - name: Load additional cached dependencies
+          if: inputs.additional-working-directory != ''
+          id: restore-additional-dependency-cache
+          uses: actions/cache/restore@v5
+          with:
+              fail-on-cache-miss: true
+              path: ${{ inputs.additional-working-directory }}/node_modules
+              key: modules-npm-${{ inputs.additional-working-directory }}-${{ hashFiles(format('{0}/package-lock.json', inputs.additional-working-directory)) }}
