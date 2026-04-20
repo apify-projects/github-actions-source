@@ -47,7 +47,7 @@ jobs:
                   npm ci
 
             - name: install additional npm dependencies
-              if: steps.check-additional-dependencies-cache.outputs.cache-hit != 'true'
+              if: inputs.additional-working-directory != '' && steps.check-additional-dependencies-cache.outputs.cache-hit != 'true'
               run: |
                   cd ${{ inputs.additional-working-directory }}
                   npm ci
